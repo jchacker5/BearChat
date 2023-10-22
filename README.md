@@ -1,25 +1,63 @@
-# 📦 Streamlit App Starter Kit 
+# Welcome to the Bridgewater State University FAQ Bot!
+#BearChat
+
+This project is a specialized Streamlit application that uses Langchain and Playwright to answer student questions about `bridgew.edu`. The application also features a SQLite database to store previously answered questions, reducing the need for repeated site scraping.
+
+## Installation
+
+First, clone the repository to your local machine.
+
+### Prerequisites
+
+Install the necessary Python packages:
+
+```bash
+pip install playwright streamlit sqlite
 ```
-⬆️ (Replace above with your app's name)
+
+Then, install a Playwright browser:
+
+```bash
+playwright install
 ```
 
-Description of the app ...
+## Usage
 
-## Demo App
+To start the Streamlit app, run:
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://app-starter-kit.streamlit.app/)
+```bash
+streamlit run bearchat.py
+```
 
-## GitHub Codespaces
+Open the URL displayed in your terminal to access the Streamlit interface.
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/app-starter-kit?quickstart=1)
+### How to Use
 
-## Section Heading
+1. The Streamlit app will prompt you to enter a question about `bridgew.edu`.
+2. Click the 'Submit' button to get the answer.
+3. The application will first check the SQLite database for a previously stored answer. If found, it will display the answer from the database.
+4. If the question is new, the Langchain agent will use Playwright tools to scrape or interact with the `bridgew.edu` site to find the answer.
+5. The new question and its answer will be stored in the SQLite database for future queries.
 
-This is filler text, please replace this with text for this section.
+## Features
 
-## Further Reading
+- Streamlit interface for ease of use
+- Langchain agent with Playwright tools for web interactions
+- SQLite database to store and retrieve previous queries
 
-This is filler text, please replace this with a explanatory text about further relevant resources for this repo
-- Resource 1
-- Resource 2
-- Resource 3
+## Status
+- [x] Streamlit interface
+- [x] Langchain agent
+- [x] Playwright tools
+- [x] SQLite database
+- [ ] Docker container
+
+
+## Contributing
+
+If you'd like to contribute, please fork the repository and make changes as you'd like. Pull requests are warmly welcome.
+
+## License
+
+This project is open-source and available under the [MIT License](LICENSE).
+
