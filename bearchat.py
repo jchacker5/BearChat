@@ -1,71 +1,44 @@
-from pathlib import Path
 import streamlit as st
-import sqlite3
-import asyncio
-from langchain import OpenAI, LLMMathChain, SQLDatabase, SQLDatabaseChain, Tool, initialize_agent, AgentType
+from langchain.agents import initialize_agent, AgentType, Tool
 from langchain.document_loaders import WebBaseLoader
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.chat_models.openai import ChatOpenAI
-from datetime import datetime
+from langchain.chat_models import ChatOpenAI
+import json
 # Streamlit Configuration
-
 st.set_page_config(page_title="Welcome to BearChat", page_icon='🐻💬', layout="centered", initial_sidebar_state="collapsed")
-st.title("Welcome to BearChat🐻💬, powered by ChatGPT")
-# SQLite Database Initialization
-DB_PATH = Path("queries.db").absolute()
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
-cursor.execute('''CREATE TABLE IF NOT EXISTS questions (question TEXT, answer TEXT)''')
-conn.commit()
+st.title("Welcome to BearChat🐻💬")
 
 # User OpenAI API Key Input
 user_openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
 enable_custom = bool(user_openai_api_key)
 openai_api_key = user_openai_api_key if enable_custom else "not_supplied"
 
-# Initialize LLM and Tools
+# Initialize LLM
 llm = ChatOpenAI(
-        temperature=0,
-        openai_api_key=openai_api_key,
-        model_name="gpt-4",
-        max_tokens=2048,
-        streaming=True,
-    )
+    temperature=0,
+    openai_api_key=openai_api_key,
+    model_name="gpt-3.5-turbo",
+    max_tokens=2048,
+    streaming=True
+)
 
-# Define web_qa 
-def web_qa(url_list, query, output_name):
+# Modify web_qa to return the answer
+def web_qa(url_list, query):
     loader_list = []
     for i in url_list:
-        print('loading url: %s' % i)
         loader_list.append(WebBaseLoader(i))
-
     index = VectorstoreIndexCreator().from_loaders(loader_list)
-    ans = index.query(question=query,
-                      llm=llm)
-    print("")
-    print(ans)
-
-    outfile_name = output_name + datetime.now().strftime("%m-%d-%y-%H%M%S") + ".out"
-    with open(outfile_name, 'w') as f:
-        f.write(ans)
-
+    ans = index.query(question=query, llm=llm)
+    return ans
 
 # Define web_qa as a tool
 def web_qa_tool(query):
-    url_list = [
-        "https://example1.com",
-        "https://example2.com"
-    ]
-    web_qa(url_list, query, "output_name")
+    url_list = ["https://www.bridgew.edu"]
+    return web_qa(url_list, query)
 
-tools = [
-    Tool(name="web_qa_tool", func=web_qa_tool),
-    Tool(name="Queries DB", func=db_chain.run),
-]
-
-# Initialize Langchain Agent
+# Initialize Langchain Agent with only web_qa_tool
 agent_chain = initialize_agent(
-    tools=tools,
+    tools=[Tool(name="web_qa_tool", func=web_qa_tool, description="This tool performs web-based QA")],
     llm=llm,
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
@@ -83,21 +56,17 @@ if st.session_state.get("messages"):
 
 if prompt := st.chat_input("Your question"):
     st.session_state.messages.append({"role": "user", "content": prompt})
-
-    cursor.execute("SELECT answer FROM questions WHERE question=?", (prompt,))
-    db_answer = cursor.fetchone()
-
-    if db_answer:
-        answer = db_answer[0]
+    langchain_response = agent_chain.run(prompt)
+    
+    print("Debug info: ", langchain_response)  # Debug: Print the response
+    
+    if isinstance(langchain_response, str):  # Check if it's a string
+        answer = langchain_response  # Directly use the string as the answer
+    elif isinstance(langchain_response, dict):  # Check if it's a dictionary
+        answer = langchain_response.get('answer', 'No answer found.')  # Safely access key
     else:
-        langchain_response = agent_chain.run(prompt)
-        answer = langchain_response['answer']
-        cursor.execute("INSERT INTO questions (question, answer) VALUES (?, ?)", (prompt, answer))
-        conn.commit()
-
+        answer = "No answer found."
+    
     with st.chat_message("assistant"):
         st.write(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
-
-# Close database
-conn.close()
