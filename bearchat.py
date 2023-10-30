@@ -1,3 +1,4 @@
+import os 
 import streamlit as st
 from langchain.agents import initialize_agent, AgentType, Tool
 from langchain.document_loaders import WebBaseLoader
@@ -17,7 +18,7 @@ openai_api_key = user_openai_api_key if enable_custom else "not_supplied"
 llm = ChatOpenAI(
     temperature=0,
     openai_api_key=openai_api_key,
-    model_name="gpt-3.5-turbo",
+    model_name="gpt-3.5-turbo-0613",
     max_tokens=2048,
     streaming=True
 )

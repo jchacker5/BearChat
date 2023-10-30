@@ -1,63 +1,56 @@
-# Welcome to the Bridgewater State University FAQ Bot!
-#BearChat
+# Welcome to BearChat: Bridgewater State University's FAQ Bot
 
-This project is a specialized Streamlit application that uses Langchain and Playwright to answer student questions about `bridgew.edu`. The application also features a SQLite database to store previously answered questions, reducing the need for repeated site scraping.
+BearChat is a Streamlit-based FAQ bot designed to assist students with inquiries about Bridgewater State University. Utilizing Langchain and OpenAI's GPT-3, the bot provides real-time, context-aware answers.
 
 ## Installation
 
-First, clone the repository to your local machine.
-
 ### Prerequisites
 
-Install the necessary Python packages:
+- Python 3.x
+- pip (Python package installer)
 
+### Steps
+
+1. Clone this repository to your local machine.
+   
 ```bash
-pip install playwright streamlit sqlite
+git clone <repository_url>
 ```
 
-Then, install a Playwright browser:
+2. Install the required Python packages:
 
 ```bash
-playwright install
+pip install streamlit
 ```
 
 ## Usage
 
-To start the Streamlit app, run:
+Run the Streamlit app with the following command:
 
 ```bash
 streamlit run bearchat.py
 ```
 
-Open the URL displayed in your terminal to access the Streamlit interface.
+A URL will appear in your terminal. Open this URL in a web browser to interact with the bot.
 
-### How to Use
+## How It Works
 
-1. The Streamlit app will prompt you to enter a question about `bridgew.edu`.
-2. Click the 'Submit' button to get the answer.
-3. The application will first check the SQLite database for a previously stored answer. If found, it will display the answer from the database.
-4. If the question is new, the Langchain agent will use Playwright tools to scrape or interact with the `bridgew.edu` site to find the answer.
-5. The new question and its answer will be stored in the SQLite database for future queries.
+1. The Streamlit interface prompts you to enter your query.
+2. Your query is processed by an agent initialized via Langchain.
+3. The agent utilizes OpenAI's GPT-3 for generating a context-aware response.
 
 ## Features
 
-- Streamlit interface for ease of use
-- Langchain agent with Playwright tools for web interactions
-- SQLite database to store and retrieve previous queries
+- User-friendly Streamlit interface
+- Context-aware responses via OpenAI's GPT-3
+- Modular design powered by Langchain
 
-## Status
-- [x] Streamlit interface
-- [x] Langchain agent
-- [x] Playwright tools
-- [x] SQLite database
-- [ ] Docker container
+## Tech Stack
 
-
-## Contributing
-
-If you'd like to contribute, please fork the repository and make changes as you'd like. Pull requests are warmly welcome.
+- **Streamlit**: Web interface
+- **Langchain**: Agent initialization and management
+- **OpenAI's GPT-3**: Chat model for generating responses
 
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
-
