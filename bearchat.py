@@ -1,73 +1,56 @@
-import os 
+# Import necessary modules
 import streamlit as st
-from langchain.agents import initialize_agent, AgentType, Tool
-from langchain.document_loaders import WebBaseLoader
-from langchain.indexes import VectorstoreIndexCreator
+from langchain.agents import initialize_agent, AgentType
+from langchain.callbacks import StreamlitCallbackHandler
 from langchain.chat_models import ChatOpenAI
-import json
-# Streamlit Configuration
-st.set_page_config(page_title="Welcome to BearChat", page_icon='🐻💬', layout="centered", initial_sidebar_state="collapsed")
-st.title("Welcome to BearChat🐻💬")
+from langchain.tools import DuckDuckGoSearchRun
 
-# User OpenAI API Key Input
-user_openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
-enable_custom = bool(user_openai_api_key)
-openai_api_key = user_openai_api_key if enable_custom else "not_supplied"
+# Set the app title and page config
+st.set_page_config(page_title="🐻💬 BearGPT Chat")
+st.title("🐻💬 Welcome to BearGPT Chat")
 
-# Initialize LLM
-llm = ChatOpenAI(
-    temperature=0,
-    openai_api_key=openai_api_key,
-    model_name="gpt-3.5-turbo-0613",
-    max_tokens=2048,
-    streaming=True
-)
+# Sidebar for API key input
+with st.sidebar:
+    openai_api_key = st.text_input("Please Enter OpenAI API Key", key="langchain_search_api_key_openai", type="password")
+    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
 
-# Modify web_qa to return the answer
-def web_qa(url_list, query):
-    loader_list = []
-    for i in url_list:
-        loader_list.append(WebBaseLoader(i))
-    index = VectorstoreIndexCreator().from_loaders(loader_list)
-    ans = index.query(question=query, llm=llm)
-    return ans
+# Welcome message
+"""
+Welcome Bears to BearGPT Chat! This is a demo of a python built AI chatbot built to serve your needs as a student feel free to ask any questions about school or anything else you would like to know about.
+"""
 
-# Define web_qa as a tool
-def web_qa_tool(query):
-    url_list = ["https://www.bridgew.edu"]
-    return web_qa(url_list, query)
-
-# Initialize Langchain Agent with only web_qa_tool
-agent_chain = initialize_agent(
-    tools=[Tool(name="web_qa_tool", func=web_qa_tool, description="This tool performs web-based QA")],
-    llm=llm,
-    agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-)
-
-# Initialize Session State
+# Initialize chat messages if not present
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Ask me a question about Bridgew.edu!"}]
+    st.session_state["messages"] = [
+        {"role": "assistant", "content": "Hi, I'm a chatbot who can search the web. How can I help you?"}
+    ]
 
-# Chat UI and Logic
-if st.session_state.get("messages"):
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+# Display previous chat messages
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg["content"])
 
-if prompt := st.chat_input("Your question"):
+# Handle new user input
+if prompt := st.chat_input(placeholder="Tell me about Bridgwater State University"):
+    # Append the new user message to session state
     st.session_state.messages.append({"role": "user", "content": prompt})
-    langchain_response = agent_chain.run(prompt)
+    # Display the new user message
+    st.chat_message("user").write(prompt)
+
+    # Check for OpenAI API key
+    if not openai_api_key:
+        st.info("Please add your OpenAI API key to continue.")
+        st.stop()
+
+    # Initialize the language model and search tool
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=openai_api_key, streaming=True)
+    search = DuckDuckGoSearchRun(name="Search")
     
-    print("Debug info: ", langchain_response)  # Debug: Print the response
-    
-    if isinstance(langchain_response, str):  # Check if it's a string
-        answer = langchain_response  # Directly use the string as the answer
-    elif isinstance(langchain_response, dict):  # Check if it's a dictionary
-        answer = langchain_response.get('answer', 'No answer found.')  # Safely access key
-    else:
-        answer = "No answer found."
-    
+    # Create the search agent
+    search_agent = initialize_agent([search], llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, handle_parsing_errors=True)
+
+    # Generate and display the assistant's response
     with st.chat_message("assistant"):
-        st.write(answer)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+        response = search_agent.run(st.session_state.messages, callbacks=[st_cb])
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        st.write(response)

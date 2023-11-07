@@ -1,5 +1,3 @@
-asyncio
 streamlit
-langchain
-sqlite3
-playwright install
+langchain 
+duckduckgo-search
