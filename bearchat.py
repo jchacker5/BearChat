@@ -1,56 +1,63 @@
-# Import necessary modules
+import openai
 import streamlit as st
-from langchain.agents import initialize_agent, AgentType
-from langchain.callbacks import StreamlitCallbackHandler
-from langchain.chat_models import ChatOpenAI
-from langchain.tools import DuckDuckGoSearchRun
+import time
 
-# Set the app title and page config
-st.set_page_config(page_title="🐻💬 BearGPT Chat")
+# Set the Streamlit page configuration
+st.set_page_config(page_title="🐻💬 BearGPT Chat", layout="wide")
+
+# Streamlit title
 st.title("🐻💬 Welcome to BearGPT Chat")
 
-# Sidebar for API key input
-with st.sidebar:
-    openai_api_key = st.text_input("Please Enter OpenAI API Key", key="langchain_search_api_key_openai", type="password")
-    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
+# Input for OpenAI API Key
+openai_api_key = st.sidebar.text_input("Enter your OpenAI API Key", type="password")
+if openai_api_key:
+    openai.api_key = openai_api_key
+else:
+    st.error("Please enter your OpenAI API key to proceed.")
+    st.stop()
 
 # Welcome message
-"""
-Welcome Bears to BearGPT Chat! This is a demo of a python built AI chatbot built to serve your needs as a student feel free to ask any questions about school or anything else you would like to know about.
-"""
+st.write("Welcome Bears to BearGPT Chat! This is a demo of an AI chatbot built to serve your needs as a student. Feel free to ask any questions about school or anything else you would like to know about.")
 
-# Initialize chat messages if not present
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [
-        {"role": "assistant", "content": "Hi, I'm a chatbot who can search the web. How can I help you?"}
-    ]
+# Function to create an OpenAI Assistant
+def create_assistant():
+    return openai.Assistant.create(
+        model="gpt-4-1106-preview",
+        name="BSU Information Assistant",
+        instructions="You are an assistant that provides information about Bridgewater State University. Answer questions to the best of your knowledge and provide helpful responses.",
+    )
 
-# Display previous chat messages
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-# Handle new user input
-if prompt := st.chat_input(placeholder="Tell me about Bridgwater State University"):
-    # Append the new user message to session state
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    # Display the new user message
-    st.chat_message("user").write(prompt)
-
-    # Check for OpenAI API key
-    if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
-        st.stop()
-
-    # Initialize the language model and search tool
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=openai_api_key, streaming=True)
-    search = DuckDuckGoSearchRun(name="Search")
+# Function to run the assistant and get the response
+def get_assistant_response(assistant_id, user_message):
+    thread = openai.Thread.create()
+    message = openai.Message.create(
+        thread_id=thread.id,
+        role="user",
+        content=user_message
+    )
+    run = openai.Run.create(
+        assistant_id=assistant_id,
+        thread_id=thread.id
+    )
     
-    # Create the search agent
-    search_agent = initialize_agent([search], llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, handle_parsing_errors=True)
+    # Polling for the assistant's response
+    while True:
+        run_status = openai.Run.retrieve(run.id)
+        if run_status['status'] == 'succeeded':
+            break
+        time.sleep(1)  # Poll every second
 
-    # Generate and display the assistant's response
-    with st.chat_message("assistant"):
-        st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
-        response = search_agent.run(st.session_state.messages, callbacks=[st_cb])
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    messages = openai.Message.list(thread_id=thread.id)
+    return [msg['content'] for msg in messages.data if msg['role'] == 'assistant']
+
+# Initialize assistant
+assistant = create_assistant() if openai_api_key else None
+
+# User input
+user_input = st.text_input("Ask a question:")
+
+# If there's user input, get and display the response from the assistant
+if user_input and assistant:
+    responses = get_assistant_response(assistant.id, user_input)
+    for response in responses:
         st.write(response)
