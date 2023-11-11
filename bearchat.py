@@ -1,6 +1,10 @@
 import openai
+import os
 import streamlit as st
+from openai import OpenAI
 import time
+from dotenv import load_dotenv
+
 
 # Set the Streamlit page configuration
 st.set_page_config(page_title="🐻💬 BearGPT Chat", layout="wide")
@@ -15,8 +19,10 @@ if not openai_api_key:
     st.stop()
 
 # Setting the API key
-openai.api_key = openai_api_key
 
+client = OpenAI(api_key=openai_api_key)
+client.api_key = os.environ.get('OPENAI_API_KEY')
+load_dotenv()
 # Welcome message
 st.write("Welcome Bears to BearGPT Chat! ...")
 
@@ -24,7 +30,7 @@ st.write("Welcome Bears to BearGPT Chat! ...")
 @st.cache(allow_output_mutation=True)
 def create_assistant():
     try:
-        return openai.Assistant.create(
+        return client.beta.assistants.create(
             model="gpt-4-1106-preview",
             name="BSU Information Assistant",
             instructions="You are an assistant that provides information ...",
@@ -37,13 +43,13 @@ def create_assistant():
 # Function to run the assistant and get the response
 def get_assistant_response(assistant_id, user_message):
     try:
-        thread = openai.Thread.create()
-        message = openai.Message.create(
+        thread = client.beta.threads.create()
+        message = client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=user_message
         )
-        run = openai.Run.create(
+        run = client.beta.threads.runs.create(
             assistant_id=assistant_id,
             thread_id=thread.id
         )
