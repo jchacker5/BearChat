@@ -1,3 +1,5 @@
 streamlit
-langchain 
-duckduckgo-search
+openai
+bs4
+requests
+```
