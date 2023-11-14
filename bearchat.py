@@ -3,7 +3,7 @@ import streamlit as st
 import requests
 import time
 import os
-from dotenv import load_dotenv
+
 
 # set Streamlit configuration
 st.set_page_config(page_title="🐻💬 BearChat", layout="wide")
@@ -13,7 +13,7 @@ st.title("🐻💬 Welcome to BearChat")
 assistant_id = 'asst_or5rq7uFw9b6Yfcm1MXqOzSE'
 
 # Initialize the OpenAI client
-load_dotenv()
+
 client = openai
 api_key = os.environ.get("OPENAI_API_KEY")
 # Initialize session state variables for file IDs and chat control
