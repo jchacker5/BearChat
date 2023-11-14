@@ -1,7 +1,6 @@
 import openai
 import streamlit as st
 import requests
-import pdfkit
 import time
 import os
 from dotenv import load_dotenv
