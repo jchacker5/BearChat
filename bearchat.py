@@ -1,78 +1,164 @@
 import openai
 import streamlit as st
 import requests
-from bs4 import BeautifulSoup
 import pdfkit
 import time
 import os
 from dotenv import load_dotenv
 
-# Load environment variables and set Streamlit configuration
-load_dotenv()
+# set Streamlit configuration
 st.set_page_config(page_title="🐻💬 BearChat", layout="wide")
 st.title("🐻💬 Welcome to BearChat")
 
-# Initialize OpenAI client with API key
-openai.api_key = os.getenv('OPENAI_API_KEY')
-client = openai
-
-# Assistant configuration
+# Set your OpenAI Assistant ID here
 assistant_id = 'asst_or5rq7uFw9b6Yfcm1MXqOzSE'
 
-# Scrape website and convert text to PDF
-def scrape_website(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    return soup.get_text()
+# Initialize the OpenAI client
+load_dotenv()
+client = openai
+api_key = os.environ.get("OPENAI_API_KEY")
+# Initialize session state variables for file IDs and chat control
+if "file_id_list" not in st.session_state:
+    st.session_state.file_id_list = []
 
-def text_to_pdf(text, filename):
-    config = pdfkit.configuration(wkhtmltopdf='/usr/local/bin/wkhtmltopdf')
-    pdfkit.from_string(text, filename, configuration=config)
-    return filename
+if "start_chat" not in st.session_state:
+    st.session_state.start_chat = False
 
-def upload_to_openai(filepath):
-    with open(filepath, "rb") as file:
-        response = openai.File.create(file=file, purpose="answers")
-    return response.id
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = None
+    
 
-# Create an OpenAI Assistant
-@st.cache(allow_output_mutation=True)
-def create_assistant():
-    try:
-        return client.beta.assistants.create(
-            model="gpt-4-1106-preview",
-            name="BearChat Assistant",
-            instructions="Assist students with queries related to Bridgewater State University.",
-            tools=[{"type": "code_interpreter"}, {"type": "web_scraping"}, {"type": "web_search"}]
+# Create a sidebar for API key configuration and additional features
+st.sidebar.header("File Uploads")
+# Create a sidebar for API key configuration and additional features
+st.sidebar.header("Configuration")
+api_key = st.sidebar.text_input("Enter your OpenAI API key", type="password")
+if api_key:
+    openai.api_key = api_key
+
+
+# Sidebar option for users to upload their own files
+uploaded_file = st.sidebar.file_uploader("Upload a file to OpenAI embeddings", key="file_uploader")
+
+# function to upload files to OpenAI
+def upload_to_openai(file_path):
+    """Upload a file to OpenAI and return the file ID."""
+    with open(file_path, "rb") as f:
+        file_contents = f.read()
+
+    response = client.beta.files.upload(
+        file_contents=file_contents,
+        purpose="embeddings"
+    )
+
+    return response["id"]
+
+# Display all file IDs
+if st.session_state.file_id_list:
+    st.sidebar.write("Uploaded File IDs:")
+    for file_id in st.session_state.file_id_list:
+        st.sidebar.write(file_id)
+        # Associate files with the assistant
+        assistant_file = client.beta.assistants.files.create(
+            assistant_id=assistant_id, 
+            file_id=file_id
         )
-    except Exception as e:
-        st.error(f"Failed to create assistant: {e}")
-        st.stop()
 
-assistant = create_assistant()
+# Button to start the chat session
+if st.sidebar.button("Start Chat"):
+    st.session_state.start_chat = True
+    # Create a thread once and store its ID in session state
+    thread = client.beta.threads.create()
+    st.session_state.thread_id = thread.id
+    st.write("thread id: ", thread.id)
+   
 
-# Get and display assistant response
-def get_assistant_response(assistant_id, user_message):
-    try:
-        thread = client.beta.threads.create()
-        client.beta.threads.messages.create(thread_id=thread.id, role="user", content=user_message)
-        run = client.beta.threads.runs.create(assistant_id=assistant_id, thread_id=thread.id)
-        timeout = 30  # Timeout after 30 seconds
-        start_time = time.time()
-        while True:
-            run_status = client.beta.threads.retrieve(run.id)
-            if run_status['status'] == 'succeeded': break
-            elif run_status['status'] == 'failed' or time.time() - start_time > timeout:
-                st.error("Error in processing request.")
-                return []
+# Define the function to process messages with citations
+def process_message_with_citations(message):
+    """Extract content and annotations from the message and format citations as footnotes."""
+    message_content = message.content[0].text
+    annotations = message_content.annotations if hasattr(message_content, 'annotations') else []
+    citations = []
+
+    # Iterate over the annotations and add footnotes
+    for index, annotation in enumerate(annotations):
+        # Replace the text with a footnote
+        message_content.value = message_content.value.replace(annotation.text, f' [{index + 1}]')
+
+        # Gather citations based on annotation attributes
+        if (file_citation := getattr(annotation, 'file_citation', None)):
+            # Retrieve the cited file details (dummy response here since we can't call OpenAI)
+            cited_file = {'filename': 'cited_document.pdf'}  # This should be replaced with actual file retrieval
+            citations.append(f'[{index + 1}] {file_citation.quote} from {cited_file["filename"]}')
+        elif (file_path := getattr(annotation, 'file_path', None)):
+            # Placeholder for file download citation
+            cited_file = {'filename': 'downloaded_document.pdf'}  # This should be replaced with actual file retrieval
+            citations.append(f'[{index + 1}] Click [here](#) to download {cited_file["filename"]}')  # The download link should be replaced with the actual download path
+
+    # Add footnotes to the end of the message content
+    full_response = message_content.value + '\n\n' + '\n'.join(citations)
+    return full_response
+
+# Main chat interface setup
+st.write("Welcome to Bearchat. A chatbot that can answer your questions about Bridgewater State University. Bearchat is here to help you navigate being a student at BSU.")
+
+# Only show the chat interface after the user has clicked the start chat button
+if st.session_state.start_chat:
+    # Initialize the model and messages list if not already in session state
+    if "openai_model" not in st.session_state:
+        st.session_state.openai_model = "gpt-3.5-turbo-16k"
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display existing messages in the chat
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat input for the user
+    if prompt := st.chat_input("Tell me about Bridgewater State University...."):
+        # Add user message to the state and display it
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Add the user's message to the existing thread
+        client.beta.threads.messages.create(
+            thread_id=st.session_state.thread_id,
+            role="user",
+            content=prompt
+        )
+
+        # Create a run with additional instructions
+        run = client.beta.threads.runs.create(
+            thread_id=st.session_state.thread_id,
+            assistant_id=assistant_id,
+            instructions="Please answer the queries using the knowledge provided on the site https://www.bridgew.edu/"
+        )
+
+        # Poll for the run to complete and retrieve the assistant's messages
+        while run.status != 'completed':
             time.sleep(1)
-        return [msg['content'] for msg in client.beta.threads.messages.list(thread_id=thread.id).data if msg['role'] == 'assistant']
-    except Exception as e:
-        st.error(f"Error: {e}")
-        return []
+            run = client.beta.threads.runs.retrieve(
+                thread_id=st.session_state.thread_id,
+                run_id=run.id
+            )
 
-user_input = st.text_input("Tell me about Bridgewater State University...")
-if user_input and assistant:
-    responses = get_assistant_response(assistant.id, user_input)
-    for response in responses:
-        st.write(response)
+        # Retrieve messages added by the assistant
+        messages = client.beta.threads.messages.list(
+            thread_id=st.session_state.thread_id
+        )
+
+        # Process and display assistant messages
+        assistant_messages_for_run = [
+            message for message in messages 
+            if message.run_id == run.id and message.role == "assistant"
+        ]
+        for message in assistant_messages_for_run:
+            full_response = process_message_with_citations(message)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            with st.chat_message("assistant"):
+                st.markdown(full_response, unsafe_allow_html=True)
+else:
+    # Display a message if the user hasn't started the chat
+    st.write("Click the Start Chat button in the left sidebar to start chatting with Bearchat.")
