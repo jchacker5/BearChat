@@ -34,6 +34,7 @@ st.sidebar.header("Configuration")
 api_key = st.sidebar.text_input("Enter your OpenAI API key", type="password")
 # Check if API key is entered
 if api_key:
+    openai.api_key = api_key
     st.session_state.start_chat_enabled = True
 else:
     st.session_state.start_chat_enabled = False
